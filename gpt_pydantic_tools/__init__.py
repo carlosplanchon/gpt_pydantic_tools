@@ -18,6 +18,7 @@ from pydantic._internal._model_construction import ModelMetaclass
 from enum import StrEnum
 
 from typing import Any
+from typing import Optional
 
 
 def remove_key_from_dict(
@@ -56,10 +57,21 @@ ToolsSchemaT = list[dict[str, Any]]
 
 
 def pydantic_obj_to_tool_schema(
-    pydantic_obj: BaseModel,
+    pydantic_obj: BaseModel | None = None,
+    pydantic_obj_json_schema: dict[Any, Any] | None = None,
     description: str = None
         ) -> ToolsSchemaT:
-    json_data = pydantic_obj.schema()
+
+    if pydantic_obj is None and pydantic_obj_json_schema is None:
+        raise ValueError(
+            "You need to provide either pydantic_obj "
+            "or pydantic_obj_json_schema"
+        )
+
+    if pydantic_obj is not None:
+        json_data = pydantic_obj.schema()
+    else:
+        json_data = pydantic_obj_json_schema
 
     func_name: str = json_data["title"]
 
@@ -90,7 +102,14 @@ def pydantic_obj_to_tool_schema(
 
 @attrs.define()
 class ToolSchemaManager:
-    pydantic_obj: ModelMetaclass = attrs.field(validator=type_validator())
+    pydantic_obj: Optional[ModelMetaclass] = attrs.field(
+        validator=type_validator(),
+        default=None
+    )
+    pydantic_obj_json_schema: Optional[dict[Any, Any]] = attrs.field(
+        validator=type_validator(),
+        default=None
+    )
 
     tools_schema: ToolsSchemaT = attrs.field(
         validator=type_validator(),
@@ -110,6 +129,7 @@ class ToolSchemaManager:
     def __attrs_post_init__(self):
         self.tools_schema = pydantic_obj_to_tool_schema(
             pydantic_obj=self.pydantic_obj,
+            pydantic_obj_json_schema=self.pydantic_obj_json_schema,
             description=self.description
         )
 

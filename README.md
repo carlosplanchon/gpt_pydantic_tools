@@ -37,6 +37,11 @@ tool_schema = schema_manager.tools_schema
 tool_choice = get_tool_choice_dict(ToolChoiceEnum.AUTO, schema_manager)
 ```
 
+If you want to do the Pydantic Schema conversion yourself, and directly provide the JSON instead, you can do:
+```
+schema_manager = ToolSchemaManager(pydantic_obj_json_schema=my_model_json_schema)
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests, create issues, and suggest improvements to the repository.

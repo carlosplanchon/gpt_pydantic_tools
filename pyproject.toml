@@ -8,7 +8,7 @@ packages = ["gpt_pydantic_tools"]
 
 [project]
 name = "gpt_pydantic_tools"
-version = "0.1"
+version = "0.2"
 authors = [
     {name = "Carlos A. Planchón", email = "carlosandresplanchonprestes@gmail.com"}
 ]
