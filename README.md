@@ -9,9 +9,9 @@ The `gpt_pydantic_tools` repository offers a Python module designed to integrate
 
 ## Installation
 
-Install directly using pip:
+Install directly using uv:
 ```bash
-pip install gpt-pydantic-tools
+uv add gpt-pydantic-tools
 ```
 
 ## Usage

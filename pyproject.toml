@@ -1,25 +1,26 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[options]
-package_dir = "gpt_pydantic_tools"
-packages = ["gpt_pydantic_tools"]
 
 [project]
 name = "gpt_pydantic_tools"
-version = "0.2"
+version = "0.3"
 authors = [
     {name = "Carlos A. Planchón", email = "carlosandresplanchonprestes@gmail.com"}
 ]
+requires-python = ">=3.12"
 description = "Define GPT tool schemas using Pydantic."
 classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Build Tools",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14"
 ]
-license = {text = "MIT License"}
+
+license = "MIT"
+license-files = ["LICENSE"]
+
 keywords = ["gpt", "ai", "tool", "schemas", "pydantic", "json"]
 readme = "README.md"
 dependencies=[
@@ -30,4 +31,7 @@ dependencies=[
 ]
 
 [project.urls]
-repository = "https://github.com/carlosplanchon/gpt_pydantic_tools.git"
+Repository = "https://github.com/carlosplanchon/gpt_pydantic_tools.git"
+
+[tool.setuptools]
+packages = ["gpt_pydantic_tools"]
