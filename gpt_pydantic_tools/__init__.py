@@ -48,6 +48,60 @@ def remove_key_from_dict(
         return dict_obj
 
 
+# JSON Schema keywords whose value is a subschema or a list of subschemas.
+SUBSCHEMA_KEYWORDS: frozenset[str] = frozenset({
+    "additionalItems", "additionalProperties", "allOf", "anyOf",
+    "contains", "else", "if", "items", "not", "oneOf", "prefixItems",
+    "propertyNames", "then", "unevaluatedItems", "unevaluatedProperties"
+})
+
+# JSON Schema keywords whose value maps names (field names, model
+# names, patterns...) to subschemas.
+SUBSCHEMA_MAP_KEYWORDS: frozenset[str] = frozenset({
+    "$defs", "definitions", "dependentSchemas", "patternProperties",
+    "properties"
+})
+
+
+def remove_keyword_from_schema(
+    schema: Any,
+    keyword: str
+        ) -> Any:
+    """
+    Recursively remove the specified keyword from a JSON schema.
+
+    Unlike remove_key_from_dict, it only walks through subschemas, so
+    names (e.g. a field called "title" in "properties") and values
+    (e.g. "default", "enum" or "examples") are left untouched.
+
+    :param schema: JSON schema from which the keyword should be removed
+    :param keyword: Keyword that needs to be removed
+    :return: JSON schema without the specified keyword
+    """
+    if isinstance(schema, list):
+        return [
+            remove_keyword_from_schema(schema=item, keyword=keyword)
+            for item in schema
+        ]
+    if not isinstance(schema, dict):
+        return schema
+
+    clean_schema: dict[str, Any] = {}
+    for key, value in schema.items():
+        if key == keyword:
+            continue
+        if key in SUBSCHEMA_KEYWORDS:
+            value = remove_keyword_from_schema(schema=value, keyword=keyword)
+        elif key in SUBSCHEMA_MAP_KEYWORDS and isinstance(value, dict):
+            value = {
+                name: remove_keyword_from_schema(
+                    schema=subschema, keyword=keyword
+                ) for name, subschema in value.items()
+            }
+        clean_schema[key] = value
+    return clean_schema
+
+
 ###########################################
 #                                         #
 #   --- PYDANTIC OBJ TO TOOL SCHEMA ---   #
@@ -75,9 +129,9 @@ def pydantic_obj_to_tool_schema(
 
     func_name: str = json_data["title"]
 
-    gpt_function_dict = remove_key_from_dict(
-        dict_obj=json_data,
-        key_to_remove="title"
+    gpt_function_dict = remove_keyword_from_schema(
+        schema=json_data,
+        keyword="title"
     )
 
     if "description" in gpt_function_dict.keys():
@@ -140,11 +194,13 @@ class ToolSchemaManager:
         schema_to_validate,
             ) -> bool | jsonschema.exceptions.ValidationError:
 
-        pydantic_obj_json_schema = self.pydantic_obj.schema()
+        # The tool parameters exist no matter how the manager was built
+        # (from pydantic_obj or from pydantic_obj_json_schema).
+        parameters_schema = self.tools_schema[0]["function"]["parameters"]
         try:
             jsonschema.validate(
                 instance=schema_to_validate,
-                schema=pydantic_obj_json_schema
+                schema=parameters_schema
             )
             # print("JSON data is valid.")
             return True
