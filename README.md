@@ -1,6 +1,6 @@
 # GPT Pydantic Tools
 
-The `gpt_pydantic_tools` repository offers a Python module designed to integrate Pydantic models with GPT-style tool schemas. It facilitates the transformation of Pydantic models into a format that is suitable for use with GPT-4's tools functionality, ensuring structured data and tool interaction consistency.
+The `gpt-pydantic-tools` repository offers a Python module designed to integrate Pydantic models with GPT-style tool schemas. It facilitates the transformation of Pydantic models into a format that is suitable for use with GPT-4's tools functionality, ensuring structured data and tool interaction consistency.
 
 ## Features
 
