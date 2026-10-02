@@ -14,6 +14,7 @@ from gpt_pydantic_tools import (
     ToolChoiceEnum,
     ToolSchemaManager,
     get_tool_choice_dict,
+    pydantic_obj_to_tool_schema,
     remove_key_from_dict,
     remove_keyword_from_schema,
 )
@@ -88,6 +89,19 @@ def test_description_comes_from_the_docstring():
 
     assert function["description"] == "A book."
     assert "description" not in function["parameters"]
+
+
+def test_function_and_manager_give_the_same_tool():
+    from_function = pydantic_obj_to_tool_schema(pydantic_obj=MyModel)
+    from_manager = ToolSchemaManager(pydantic_obj=MyModel).tools_schema
+
+    assert from_function == from_manager
+    assert from_function[0]["function"]["description"] == ""
+
+
+def test_function_rejects_a_description_that_is_not_a_str():
+    with pytest.raises(ValueError, match="description"):
+        pydantic_obj_to_tool_schema(pydantic_obj=MyModel, description=None)
 
 
 def test_requires_a_model_or_a_json_schema():
@@ -380,8 +394,11 @@ def test_invalid_tool_names(tool_name):
 
 def test_valid_answer(make_manager):
     manager = make_manager(Book)
+    answer = {"title": "Dune", "pages": 412}
 
-    assert manager.validate_tool_answer({"title": "Dune", "pages": 412}) is True
+    manager.validate(answer)  # does not raise
+    assert manager.is_valid(answer) is True
+    assert manager.validate_tool_answer(answer) is True
 
 
 @pytest.mark.parametrize(
@@ -390,9 +407,12 @@ def test_valid_answer(make_manager):
     ids=["missing-field", "wrong-type"],
 )
 def test_invalid_answer(make_manager, answer):
-    error = make_manager(Book).validate_tool_answer(answer)
+    manager = make_manager(Book)
 
-    assert isinstance(error, ValidationError)
+    with pytest.raises(ValidationError):
+        manager.validate(answer)
+    assert manager.is_valid(answer) is False
+    assert isinstance(manager.validate_tool_answer(answer), ValidationError)
 
 
 def test_nested_answer_is_validated_through_refs(make_manager):

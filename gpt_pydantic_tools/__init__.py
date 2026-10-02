@@ -110,7 +110,7 @@ TOOL_NAME_PATTERN = re.compile(r"[a-zA-Z0-9_-]{1,64}")
 def pydantic_obj_to_tool_schema(
     pydantic_obj: type[BaseModel] | None = None,
     pydantic_obj_json_schema: dict[Any, Any] | None = None,
-    description: str = None,
+    description: str = "",
     tool_name: str | None = None
         ) -> ToolsSchemaT:
 
@@ -135,6 +135,9 @@ def pydantic_obj_to_tool_schema(
             "pydantic_obj_json_schema must be a dict, "
             f"got {pydantic_obj_json_schema!r}"
         )
+
+    if not isinstance(description, str):
+        raise ValueError(f"description must be a str, got {description!r}")
 
     if pydantic_obj is not None:
         json_data = pydantic_obj.model_json_schema()
@@ -196,11 +199,6 @@ class ToolSchemaManager:
     tool_name: Optional[str] = None
 
     def __post_init__(self):
-        if not isinstance(self.description, str):
-            raise ValueError(
-                f"description must be a str, got {self.description!r}"
-            )
-
         self.tools_schema = pydantic_obj_to_tool_schema(
             pydantic_obj=self.pydantic_obj,
             pydantic_obj_json_schema=self.pydantic_obj_json_schema,
@@ -210,19 +208,40 @@ class ToolSchemaManager:
 
         self.tool_name = self.tools_schema[0]["function"]["name"]
 
+    def validate(self, arguments: Any) -> None:
+        """
+        Check the arguments of a tool call against the tool schema.
+
+        :param arguments: Arguments of the tool call, already parsed
+        :raises jsonschema.exceptions.ValidationError: If they don't match
+        """
+        # The tool parameters exist no matter how the manager was built
+        # (from pydantic_obj or from pydantic_obj_json_schema).
+        jsonschema.validate(
+            instance=arguments,
+            schema=self.tools_schema[0]["function"]["parameters"]
+        )
+
+    def is_valid(self, arguments: Any) -> bool:
+        """
+        Tell whether the arguments of a tool call match the tool schema.
+
+        :param arguments: Arguments of the tool call, already parsed
+        :return: True if they match, False otherwise
+        """
+        try:
+            self.validate(arguments)
+        except jsonschema.exceptions.ValidationError:
+            return False
+        return True
+
     def validate_tool_answer(
         self,
         schema_to_validate,
             ) -> bool | jsonschema.exceptions.ValidationError:
 
-        # The tool parameters exist no matter how the manager was built
-        # (from pydantic_obj or from pydantic_obj_json_schema).
-        parameters_schema = self.tools_schema[0]["function"]["parameters"]
         try:
-            jsonschema.validate(
-                instance=schema_to_validate,
-                schema=parameters_schema
-            )
+            self.validate(schema_to_validate)
             # print("JSON data is valid.")
             return True
         except jsonschema.exceptions.ValidationError as err:

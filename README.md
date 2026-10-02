@@ -108,16 +108,24 @@ tool_call = completion.choices[0].message.tool_calls[0]
 
 ### Validate the answer
 
-The model does not always follow the schema, so check the arguments before using them. `validate_tool_answer()` returns `True`, or the `jsonschema.ValidationError` that describes the problem. It does not raise it:
+The model does not always follow the schema, so check the arguments before using them. `validate()` raises a `jsonschema.ValidationError` that describes the problem:
 
 ```python
 import json
 
+from jsonschema import ValidationError
+
 arguments = json.loads(tool_call.function.arguments)
-result = weather_tool.validate_tool_answer(arguments)
-if result is not True:
-    print(result.message)  # e.g. 'kelvin' is not one of ['celsius', 'fahrenheit']
+
+try:
+    weather_tool.validate(arguments)
+except ValidationError as error:
+    print(error.message)  # e.g. 'kelvin' is not one of ['celsius', 'fahrenheit']
 ```
+
+If you only need a yes or no, `weather_tool.is_valid(arguments)` returns `True` or `False`.
+
+`validate_tool_answer()`, from earlier versions, still returns `True` or the error instead of raising it. Compare its result with `is True`: the error counts as true in an `if`.
 
 ### Start from a JSON schema
 
