@@ -1,6 +1,6 @@
 # GPT Pydantic Tools
 
-The `gpt-pydantic-tools` repository offers a Python module designed to integrate Pydantic models with GPT-style tool schemas. It facilitates the transformation of Pydantic models into a format that is suitable for use with GPT-4's tools functionality, ensuring structured data and tool interaction consistency.
+Turn Pydantic models into function-calling tools. `gpt-pydantic-tools` converts a model, or a JSON schema, into the tool format of the Chat Completions API, builds the matching `tool_choice` value, and validates the arguments the model sends back.
 
 [![CI](https://github.com/carlosplanchon/gpt-pydantic-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosplanchon/gpt-pydantic-tools/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/gpt-pydantic-tools.svg)](https://pypi.org/project/gpt-pydantic-tools/)
@@ -10,43 +10,134 @@ The `gpt-pydantic-tools` repository offers a Python module designed to integrate
 
 ## Features
 
-- **Model Conversion:** Convert Pydantic models into GPT-4 tool schemas.
-- **Flexible Tool Choice Handling:** Provides several strategies for tool invocation such as auto, required, and none, based on the context or specific requirements.
+- **Model to tool:** converts a Pydantic model, or a JSON schema, into a Chat Completions function tool. The model's docstring becomes the tool description.
+- **Lean schemas:** strips the `title` that Pydantic adds to every schema, without touching fields or values that are also called `title`.
+- **Valid tool names:** names the tool after the model, or after `tool_name`, and checks the name against the API rules: 1 to 64 ASCII letters, digits, underscores or dashes.
+- **`tool_choice` values:** `auto`, `required`, `none`, or forcing this tool.
+- **Answer validation:** checks the arguments the model returns against the tool's schema.
 
 ## Installation
 
-Install directly using uv:
 ```bash
 uv add gpt-pydantic-tools
 ```
 
+Or with pip:
+
+```bash
+pip install gpt-pydantic-tools
+```
+
 ## Usage
 
-1. **Define Pydantic Models:** Create your Pydantic models as per your requirements.
-2. **Convert to GPT Tool Schema:** Use the `ToolSchemaManager` to convert your Pydantic models into GPT tool schemas.
-3. **Tool Choice Management:** Utilize the `get_tool_choice_dict` to manage how tools are chosen for execution based on the defined strategies.
+### Define a tool
 
-Example usage:
 ```python
-from pydantic import BaseModel
-from gpt_pydantic_tools import ToolSchemaManager, get_tool_choice_dict, ToolChoiceEnum
+from typing import Literal
 
-class MyModel(BaseModel):
-    name: str
-    age: int
+from pydantic import BaseModel, Field
 
-# Convert Pydantic model to GPT tool schema
-schema_manager = ToolSchemaManager(pydantic_obj=MyModel)
-tool_schema = schema_manager.tools_schema
+from gpt_pydantic_tools import ToolChoiceEnum, ToolSchemaManager, get_tool_choice_dict
 
-# Determine tool invocation strategy
-tool_choice = get_tool_choice_dict(ToolChoiceEnum.AUTO, schema_manager)
+
+class GetWeather(BaseModel):
+    """Get the current weather in a city."""
+
+    city: str = Field(description="City name, e.g. Montevideo")
+    unit: Literal["celsius", "fahrenheit"] = "celsius"
+
+
+weather_tool = ToolSchemaManager(pydantic_obj=GetWeather, tool_name="get_weather")
 ```
 
-If you want to do the Pydantic Schema conversion yourself, and directly provide the JSON instead, you can do:
+Without `tool_name`, the tool is named after the model (`GetWeather`).
+
+`weather_tool.tools_schema` holds the tool, ready to send:
+
+```json
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "get_weather",
+      "description": "Get the current weather in a city.",
+      "parameters": {
+        "properties": {
+          "city": {
+            "description": "City name, e.g. Montevideo",
+            "type": "string"
+          },
+          "unit": {
+            "default": "celsius",
+            "enum": [
+              "celsius",
+              "fahrenheit"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "type": "object"
+      }
+    }
+  }
+]
 ```
-schema_manager = ToolSchemaManager(pydantic_obj_json_schema=my_model_json_schema)
+
+### Call the API
+
+Pass `tools_schema` as `tools`, and the result of `get_tool_choice_dict()` as `tool_choice`. With the OpenAI SDK:
+
+```python
+from openai import OpenAI
+
+client = OpenAI()
+
+completion = client.chat.completions.create(
+    model="gpt-6-astra",
+    messages=[{"role": "user", "content": "What's the weather in Montevideo?"}],
+    tools=weather_tool.tools_schema,
+    tool_choice=get_tool_choice_dict(ToolChoiceEnum.TOOL_NAME, weather_tool),
+)
+tool_call = completion.choices[0].message.tool_calls[0]
 ```
+
+`ToolChoiceEnum.TOOL_NAME` forces the model to call this tool. `AUTO`, `REQUIRED` and `NONE` map to `"auto"`, `"required"` and `"none"`.
+
+### Validate the answer
+
+The model does not always follow the schema, so check the arguments before using them. `validate_tool_answer()` returns `True`, or the `jsonschema.ValidationError` that describes the problem. It does not raise it:
+
+```python
+import json
+
+arguments = json.loads(tool_call.function.arguments)
+result = weather_tool.validate_tool_answer(arguments)
+if result is not True:
+    print(result.message)  # e.g. 'kelvin' is not one of ['celsius', 'fahrenheit']
+```
+
+### Start from a JSON schema
+
+If you already have the JSON schema, pass it instead of the model. The tool is named after the schema's `title`; if it has none, pass `tool_name`:
+
+```python
+schema_manager = ToolSchemaManager(
+    pydantic_obj_json_schema=my_json_schema,
+    tool_name="my_tool",
+)
+```
+
+## Compatibility
+
+The tools follow the Chat Completions format, which other APIs also accept, such as Mistral's and Ollama's. They are not in the format of:
+
+- OpenAI's Responses API, which puts `name` and `parameters` at the top level of the tool.
+- Anthropic's API for Claude, which uses `input_schema`.
+
+The schemas are not prepared for strict mode either (`strict: true`, which requires `additionalProperties: false` and every field in `required`). If you use the OpenAI Python SDK and need strict mode, `openai.pydantic_function_tool()` covers that case. `gpt-pydantic-tools` only depends on Pydantic and jsonschema, which makes it handy when you build the requests yourself or use another provider's client.
 
 ## Contributing
 
