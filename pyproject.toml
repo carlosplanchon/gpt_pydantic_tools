@@ -35,3 +35,15 @@ Repository = "https://github.com/carlosplanchon/gpt-pydantic-tools.git"
 
 [tool.setuptools]
 packages = ["gpt_pydantic_tools"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+# Select the classic default ruleset explicitly (pyflakes + a pycodestyle
+# subset) so linting stays deterministic across ruff releases. ruff 0.16
+# widened its implicit default.
+select = ["E4", "E7", "E9", "F"]

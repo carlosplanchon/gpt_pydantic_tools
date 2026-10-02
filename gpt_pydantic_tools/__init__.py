@@ -8,11 +8,9 @@ from pydantic import BaseModel
 import jsonschema
 
 # https://github.com/pydantic/pydantic/issues/6381
-"""
-ModelMetaclass is not a public class.
-They want to be able to refactor the ModelMetaclass
-without it being considered a breaking change.
-"""
+# ModelMetaclass is not a public class.
+# They want to be able to refactor the ModelMetaclass
+# without it being considered a breaking change.
 from pydantic._internal._model_construction import ModelMetaclass
 
 from enum import StrEnum

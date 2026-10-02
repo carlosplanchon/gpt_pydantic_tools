@@ -2,6 +2,7 @@
 
 The `gpt-pydantic-tools` repository offers a Python module designed to integrate Pydantic models with GPT-style tool schemas. It facilitates the transformation of Pydantic models into a format that is suitable for use with GPT-4's tools functionality, ensuring structured data and tool interaction consistency.
 
+[![CI](https://github.com/carlosplanchon/gpt-pydantic-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosplanchon/gpt-pydantic-tools/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/gpt-pydantic-tools.svg)](https://pypi.org/project/gpt-pydantic-tools/)
 [![Python versions](https://img.shields.io/pypi/pyversions/gpt-pydantic-tools.svg)](https://pypi.org/project/gpt-pydantic-tools/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
