@@ -7,12 +7,6 @@ from pydantic import BaseModel
 
 import jsonschema
 
-# https://github.com/pydantic/pydantic/issues/6381
-# ModelMetaclass is not a public class.
-# They want to be able to refactor the ModelMetaclass
-# without it being considered a breaking change.
-from pydantic._internal._model_construction import ModelMetaclass
-
 from enum import StrEnum
 
 from typing import Any
@@ -109,7 +103,7 @@ ToolsSchemaT = list[dict[str, Any]]
 
 
 def pydantic_obj_to_tool_schema(
-    pydantic_obj: BaseModel | None = None,
+    pydantic_obj: type[BaseModel] | None = None,
     pydantic_obj_json_schema: dict[Any, Any] | None = None,
     description: str = None
         ) -> ToolsSchemaT:
@@ -120,8 +114,16 @@ def pydantic_obj_to_tool_schema(
             "or pydantic_obj_json_schema"
         )
 
+    if pydantic_obj is not None and not (
+        isinstance(pydantic_obj, type) and issubclass(pydantic_obj, BaseModel)
+    ):
+        raise ValueError(
+            "pydantic_obj must be a Pydantic model class, "
+            f"got {pydantic_obj!r}"
+        )
+
     if pydantic_obj is not None:
-        json_data = pydantic_obj.schema()
+        json_data = pydantic_obj.model_json_schema()
     else:
         json_data = pydantic_obj_json_schema
 
@@ -154,7 +156,7 @@ def pydantic_obj_to_tool_schema(
 
 @attrs.define()
 class ToolSchemaManager:
-    pydantic_obj: Optional[ModelMetaclass] = attrs.field(
+    pydantic_obj: Optional[type[BaseModel]] = attrs.field(
         validator=type_validator(),
         default=None
     )

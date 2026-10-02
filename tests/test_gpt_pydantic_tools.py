@@ -93,6 +93,16 @@ def test_requires_a_model_or_a_json_schema():
         ToolSchemaManager()
 
 
+@pytest.mark.parametrize(
+    "value",
+    [Book(title="Dune", pages=412), dict],
+    ids=["model-instance", "class-that-is-not-a-model"],
+)
+def test_pydantic_obj_must_be_a_model_class(value):
+    with pytest.raises(ValueError):
+        ToolSchemaManager(pydantic_obj=value)
+
+
 def test_field_named_title_is_kept():
     assert parameters(ToolSchemaManager(pydantic_obj=Book)) == {
         "properties": {
