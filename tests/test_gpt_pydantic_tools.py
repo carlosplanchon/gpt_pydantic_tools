@@ -1,4 +1,6 @@
 import copy
+import pickle
+import weakref
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Literal
@@ -101,6 +103,33 @@ def test_requires_a_model_or_a_json_schema():
 def test_pydantic_obj_must_be_a_model_class(value):
     with pytest.raises(ValueError):
         ToolSchemaManager(pydantic_obj=value)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"pydantic_obj_json_schema": "not a dict"},
+        {"pydantic_obj": Book, "description": None},
+        {"pydantic_obj": Book, "description": 1},
+    ],
+    ids=["json-schema-not-a-dict", "description-none", "description-not-a-str"],
+)
+def test_invalid_arguments_raise_value_error(kwargs):
+    with pytest.raises(ValueError):
+        ToolSchemaManager(**kwargs)
+
+
+def test_manager_keeps_the_behavior_attrs_gave_it():
+    manager = ToolSchemaManager(MyModel)  # positional, as with attrs
+
+    assert manager == ToolSchemaManager(pydantic_obj=MyModel)
+    assert copy.copy(manager) == manager
+    assert copy.deepcopy(manager) == manager
+    assert pickle.loads(pickle.dumps(manager)) == manager
+    assert weakref.ref(manager)() is manager
+    assert not hasattr(manager, "__dict__")
+    with pytest.raises(TypeError):
+        hash(manager)
 
 
 def test_field_named_title_is_kept():

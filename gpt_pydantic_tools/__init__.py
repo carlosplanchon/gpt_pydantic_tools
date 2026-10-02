@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import attrs
-from attrs_strict import type_validator
-
 from pydantic import BaseModel
 
 import jsonschema
+
+from dataclasses import dataclass
+from dataclasses import field
 
 from enum import StrEnum
 
@@ -122,6 +122,14 @@ def pydantic_obj_to_tool_schema(
             f"got {pydantic_obj!r}"
         )
 
+    if pydantic_obj_json_schema is not None and not isinstance(
+        pydantic_obj_json_schema, dict
+    ):
+        raise ValueError(
+            "pydantic_obj_json_schema must be a dict, "
+            f"got {pydantic_obj_json_schema!r}"
+        )
+
     if pydantic_obj is not None:
         json_data = pydantic_obj.model_json_schema()
     else:
@@ -154,33 +162,23 @@ def pydantic_obj_to_tool_schema(
     return tools_schema
 
 
-@attrs.define()
+@dataclass(slots=True, weakref_slot=True)
 class ToolSchemaManager:
-    pydantic_obj: Optional[type[BaseModel]] = attrs.field(
-        validator=type_validator(),
-        default=None
-    )
-    pydantic_obj_json_schema: Optional[dict[Any, Any]] = attrs.field(
-        validator=type_validator(),
-        default=None
-    )
+    pydantic_obj: Optional[type[BaseModel]] = None
+    pydantic_obj_json_schema: Optional[dict[Any, Any]] = None
 
-    tools_schema: ToolsSchemaT = attrs.field(
-        validator=type_validator(),
-        init=False
-    )
+    tools_schema: ToolsSchemaT = field(init=False)
 
-    tool_name: str = attrs.field(
-        validator=type_validator(),
-        init=False
-    )
+    tool_name: str = field(init=False)
 
-    description: str = attrs.field(
-        validator=type_validator(),
-        default=""
-    )
+    description: str = ""
 
-    def __attrs_post_init__(self):
+    def __post_init__(self):
+        if not isinstance(self.description, str):
+            raise ValueError(
+                f"description must be a str, got {self.description!r}"
+            )
+
         self.tools_schema = pydantic_obj_to_tool_schema(
             pydantic_obj=self.pydantic_obj,
             pydantic_obj_json_schema=self.pydantic_obj_json_schema,
