@@ -8,7 +8,7 @@ from uuid import UUID
 
 import pytest
 from jsonschema import ValidationError
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from gpt_pydantic_tools import (
     ToolChoiceEnum,
@@ -49,11 +49,11 @@ def parameters(manager: ToolSchemaManager) -> dict:
 @pytest.fixture(params=["pydantic_obj", "pydantic_obj_json_schema"])
 def make_manager(request):
     """Build a ToolSchemaManager in each of the two supported ways."""
-    def make(model: type[BaseModel]) -> ToolSchemaManager:
+    def make(model: type[BaseModel], **kwargs) -> ToolSchemaManager:
         if request.param == "pydantic_obj":
-            return ToolSchemaManager(pydantic_obj=model)
+            return ToolSchemaManager(pydantic_obj=model, **kwargs)
         return ToolSchemaManager(
-            pydantic_obj_json_schema=model.model_json_schema()
+            pydantic_obj_json_schema=model.model_json_schema(), **kwargs
         )
     return make
 
@@ -317,6 +317,63 @@ def test_removes_every_title_pydantic_generates():
     assert remove_keyword_from_schema(
         schema=schema, keyword="title"
     ) == remove_key_from_dict(dict_obj=schema, key_to_remove="title")
+
+
+# --- Tool name ---
+
+class WeirdTitle(BaseModel):
+    model_config = ConfigDict(title="Get weather (v2)")
+    city: str
+
+
+def test_tool_name_can_be_given(make_manager):
+    manager = make_manager(Book, tool_name="get_book")
+
+    assert manager.tool_name == "get_book"
+    assert manager.tools_schema[0]["function"]["name"] == "get_book"
+    assert get_tool_choice_dict(ToolChoiceEnum.TOOL_NAME, manager) == {
+        "type": "function",
+        "function": {"name": "get_book"},
+    }
+
+
+def test_title_that_is_not_a_valid_tool_name(make_manager):
+    with pytest.raises(ValueError, match="tool_name"):
+        make_manager(WeirdTitle)
+
+    manager = make_manager(WeirdTitle, tool_name="get_weather")
+
+    assert manager.tool_name == "get_weather"
+
+
+def test_json_schema_without_title_needs_a_tool_name():
+    schema = {"type": "object", "properties": {"city": {"type": "string"}}}
+
+    with pytest.raises(ValueError, match="no title"):
+        ToolSchemaManager(pydantic_obj_json_schema=schema)
+
+    manager = ToolSchemaManager(
+        pydantic_obj_json_schema=schema, tool_name="get_weather"
+    )
+
+    assert manager.tool_name == "get_weather"
+
+
+@pytest.mark.parametrize("tool_name", ["a", "get-book_2", "a" * 64])
+def test_valid_tool_names(tool_name):
+    manager = ToolSchemaManager(pydantic_obj=Book, tool_name=tool_name)
+
+    assert manager.tool_name == tool_name
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    ["", "a" * 65, "get book", "Canción", "get.book", 123],
+    ids=["empty", "too-long", "space", "non-ascii", "dot", "not-a-str"],
+)
+def test_invalid_tool_names(tool_name):
+    with pytest.raises(ValueError, match="Invalid tool name"):
+        ToolSchemaManager(pydantic_obj=Book, tool_name=tool_name)
 
 
 # --- Tool answer validation ---

@@ -9,6 +9,8 @@ from dataclasses import field
 
 from enum import StrEnum
 
+import re
+
 from typing import Any
 from typing import Optional
 
@@ -101,11 +103,15 @@ def remove_keyword_from_schema(
 ###########################################
 ToolsSchemaT = list[dict[str, Any]]
 
+# Function names accepted by the Chat Completions API.
+TOOL_NAME_PATTERN = re.compile(r"[a-zA-Z0-9_-]{1,64}")
+
 
 def pydantic_obj_to_tool_schema(
     pydantic_obj: type[BaseModel] | None = None,
     pydantic_obj_json_schema: dict[Any, Any] | None = None,
-    description: str = None
+    description: str = None,
+    tool_name: str | None = None
         ) -> ToolsSchemaT:
 
     if pydantic_obj is None and pydantic_obj_json_schema is None:
@@ -135,7 +141,22 @@ def pydantic_obj_to_tool_schema(
     else:
         json_data = pydantic_obj_json_schema
 
-    func_name: str = json_data["title"]
+    if tool_name is None:
+        if "title" not in json_data:
+            raise ValueError(
+                "The JSON schema has no title to name the tool after, "
+                "pass tool_name"
+            )
+        tool_name = json_data["title"]
+
+    if not (
+        isinstance(tool_name, str) and TOOL_NAME_PATTERN.fullmatch(tool_name)
+    ):
+        raise ValueError(
+            f"Invalid tool name {tool_name!r}: it must have 1 to 64 ASCII "
+            "letters, digits, underscores or dashes (pass tool_name to "
+            "choose another one)"
+        )
 
     gpt_function_dict = remove_keyword_from_schema(
         schema=json_data,
@@ -148,7 +169,7 @@ def pydantic_obj_to_tool_schema(
         description = description
 
     tool_dict = {
-        "name": func_name,
+        "name": tool_name,
         "description": description,
         "parameters": gpt_function_dict
     }
@@ -169,9 +190,10 @@ class ToolSchemaManager:
 
     tools_schema: ToolsSchemaT = field(init=False)
 
-    tool_name: str = field(init=False)
-
     description: str = ""
+
+    # When not given, the tool is named after the schema title.
+    tool_name: Optional[str] = None
 
     def __post_init__(self):
         if not isinstance(self.description, str):
@@ -182,7 +204,8 @@ class ToolSchemaManager:
         self.tools_schema = pydantic_obj_to_tool_schema(
             pydantic_obj=self.pydantic_obj,
             pydantic_obj_json_schema=self.pydantic_obj_json_schema,
-            description=self.description
+            description=self.description,
+            tool_name=self.tool_name
         )
 
         self.tool_name = self.tools_schema[0]["function"]["name"]
