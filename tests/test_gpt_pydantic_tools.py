@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from gpt_pydantic_tools import (
     ToolChoiceEnum,
+    ToolFormat,
     ToolSchemaManager,
     get_tool_choice_dict,
     pydantic_obj_to_tool_schema,
@@ -461,3 +462,172 @@ def test_get_tool_choice_dict(tool_choice, expected):
     schema_manager = ToolSchemaManager(pydantic_obj=MyModel)
 
     assert get_tool_choice_dict(tool_choice, schema_manager) == expected
+
+
+# --- Tool formats ---
+
+MY_MODEL_PARAMETERS = {
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer"},
+    },
+    "required": ["name", "age"],
+    "type": "object",
+}
+
+
+@pytest.mark.parametrize(
+    ("tool_format", "expected"),
+    [
+        (
+            ToolFormat.CHAT_COMPLETIONS,
+            {
+                "type": "function",
+                "function": {
+                    "name": "MyModel",
+                    "description": "",
+                    "parameters": MY_MODEL_PARAMETERS,
+                },
+            },
+        ),
+        (
+            ToolFormat.RESPONSES,
+            {
+                "type": "function",
+                "name": "MyModel",
+                "description": "",
+                "parameters": MY_MODEL_PARAMETERS,
+                "strict": None,
+            },
+        ),
+        (
+            ToolFormat.ANTHROPIC,
+            {
+                "name": "MyModel",
+                "description": "",
+                "input_schema": MY_MODEL_PARAMETERS,
+            },
+        ),
+        (
+            ToolFormat.GEMINI,
+            {
+                "name": "MyModel",
+                "description": "",
+                "parameters_json_schema": MY_MODEL_PARAMETERS,
+            },
+        ),
+        (
+            ToolFormat.GEMINI_INTERACTIONS,
+            {
+                "type": "function",
+                "name": "MyModel",
+                "description": "",
+                "parameters": MY_MODEL_PARAMETERS,
+            },
+        ),
+    ],
+)
+def test_tool_formats(tool_format, expected):
+    manager = ToolSchemaManager(pydantic_obj=MyModel)
+
+    assert manager.tool(tool_format) == expected
+
+
+def test_tool_defaults_to_chat_completions_and_returns_a_copy():
+    manager = ToolSchemaManager(pydantic_obj=MyModel)
+    tool = manager.tool()
+
+    assert tool == manager.tools_schema[0]
+
+    tool["function"]["parameters"]["properties"].clear()
+
+    assert manager.tools_schema[0]["function"]["parameters"]["properties"]
+
+
+@pytest.mark.parametrize(
+    ("tool_format", "tool_choice", "expected"),
+    [
+        (ToolFormat.CHAT_COMPLETIONS, ToolChoiceEnum.AUTO, "auto"),
+        (ToolFormat.CHAT_COMPLETIONS, ToolChoiceEnum.REQUIRED, "required"),
+        (ToolFormat.CHAT_COMPLETIONS, ToolChoiceEnum.NONE, "none"),
+        (
+            ToolFormat.CHAT_COMPLETIONS,
+            ToolChoiceEnum.TOOL_NAME,
+            {"type": "function", "function": {"name": "MyModel"}},
+        ),
+        (ToolFormat.RESPONSES, ToolChoiceEnum.AUTO, "auto"),
+        (ToolFormat.RESPONSES, ToolChoiceEnum.REQUIRED, "required"),
+        (ToolFormat.RESPONSES, ToolChoiceEnum.NONE, "none"),
+        (
+            ToolFormat.RESPONSES,
+            ToolChoiceEnum.TOOL_NAME,
+            {"type": "function", "name": "MyModel"},
+        ),
+        (ToolFormat.ANTHROPIC, ToolChoiceEnum.AUTO, {"type": "auto"}),
+        (ToolFormat.ANTHROPIC, ToolChoiceEnum.REQUIRED, {"type": "any"}),
+        (ToolFormat.ANTHROPIC, ToolChoiceEnum.NONE, {"type": "none"}),
+        (
+            ToolFormat.ANTHROPIC,
+            ToolChoiceEnum.TOOL_NAME,
+            {"type": "tool", "name": "MyModel"},
+        ),
+        (
+            ToolFormat.GEMINI,
+            ToolChoiceEnum.AUTO,
+            {"function_calling_config": {"mode": "AUTO"}},
+        ),
+        (
+            ToolFormat.GEMINI,
+            ToolChoiceEnum.REQUIRED,
+            {"function_calling_config": {"mode": "ANY"}},
+        ),
+        (
+            ToolFormat.GEMINI,
+            ToolChoiceEnum.NONE,
+            {"function_calling_config": {"mode": "NONE"}},
+        ),
+        (
+            ToolFormat.GEMINI,
+            ToolChoiceEnum.TOOL_NAME,
+            {
+                "function_calling_config": {
+                    "mode": "ANY",
+                    "allowed_function_names": ["MyModel"],
+                }
+            },
+        ),
+        (
+            ToolFormat.GEMINI_INTERACTIONS,
+            ToolChoiceEnum.AUTO,
+            {"allowed_tools": {"mode": "auto"}},
+        ),
+        (
+            ToolFormat.GEMINI_INTERACTIONS,
+            ToolChoiceEnum.REQUIRED,
+            {"allowed_tools": {"mode": "any"}},
+        ),
+        (
+            ToolFormat.GEMINI_INTERACTIONS,
+            ToolChoiceEnum.NONE,
+            {"allowed_tools": {"mode": "none"}},
+        ),
+        (
+            ToolFormat.GEMINI_INTERACTIONS,
+            ToolChoiceEnum.TOOL_NAME,
+            {"allowed_tools": {"mode": "any", "tools": ["MyModel"]}},
+        ),
+    ],
+)
+def test_tool_choice_formats(tool_format, tool_choice, expected):
+    manager = ToolSchemaManager(pydantic_obj=MyModel)
+
+    assert get_tool_choice_dict(tool_choice, manager, tool_format) == expected
+
+
+def test_invalid_tool_format():
+    manager = ToolSchemaManager(pydantic_obj=MyModel)
+
+    with pytest.raises(ValueError, match="Invalid tool format"):
+        manager.tool("not-a-format")
+    with pytest.raises(ValueError, match="Invalid tool format"):
+        get_tool_choice_dict(ToolChoiceEnum.AUTO, manager, "not-a-format")

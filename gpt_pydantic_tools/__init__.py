@@ -8,12 +8,18 @@ from jsonschema.exceptions import ValidationError
 from dataclasses import dataclass
 from dataclasses import field
 
-from enum import StrEnum
+import copy
 
 import re
 
 from typing import Any
 from typing import Optional
+
+from .formats import ToolChoiceEnum
+from .formats import ToolChoiceT
+from .formats import ToolFormat
+from .formats import format_tool
+from .formats import format_tool_choice
 
 
 def remove_key_from_dict(
@@ -253,41 +259,37 @@ class ToolSchemaManager:
             # print("JSON data is invalid.")
             return err
 
+    def tool(
+        self,
+        tool_format: ToolFormat = ToolFormat.CHAT_COMPLETIONS
+            ) -> dict[str, Any]:
+        """
+        Return the tool definition in the format of the given API.
+
+        :param tool_format: Format of the API that receives the tool
+        :return: Tool definition, a copy that can be changed freely
+        """
+        function = self.tools_schema[0]["function"]
+        return format_tool(
+            name=function["name"],
+            description=function["description"],
+            parameters=copy.deepcopy(function["parameters"]),
+            tool_format=tool_format
+        )
+
 
 #####################################
 #                                   #
 #   --- TOOL CHOICE PARAMETER ---   #
 #                                   #
 #####################################
-ToolChoiceT = dict[str, Any] | str
-
-
-class ToolChoiceEnum(StrEnum):
-    AUTO = "auto"
-    REQUIRED = "required"
-    NONE = "none"
-    TOOL_NAME = "tool_name"
-
-
 def get_tool_choice_dict(
     tool_choice: ToolChoiceEnum,
-    schema_manager: ToolSchemaManager
+    schema_manager: ToolSchemaManager,
+    tool_format: ToolFormat = ToolFormat.CHAT_COMPLETIONS
         ) -> ToolChoiceT:
-    match tool_choice:
-        case ToolChoiceEnum.AUTO:
-            return "auto"
-        case ToolChoiceEnum.REQUIRED:
-            return "required"
-        case ToolChoiceEnum.NONE:
-            return "none"
-        case ToolChoiceEnum.TOOL_NAME:
-            tool_choice_value = {
-                "type": "function",
-                "function": {
-                    "name": schema_manager.tool_name
-                }
-            }
-        case _:
-            raise ValueError(f"Invalid tool choice: {tool_choice}")
-
-    return tool_choice_value
+    return format_tool_choice(
+        tool_choice=tool_choice,
+        tool_name=schema_manager.tools_schema[0]["function"]["name"],
+        tool_format=tool_format
+    )
