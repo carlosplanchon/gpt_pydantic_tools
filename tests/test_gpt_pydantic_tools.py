@@ -109,6 +109,14 @@ def test_requires_a_model_or_a_json_schema():
         ToolSchemaManager()
 
 
+def test_rejects_both_a_model_and_a_json_schema():
+    with pytest.raises(ValueError, match="not both"):
+        ToolSchemaManager(
+            pydantic_obj=MyModel,
+            pydantic_obj_json_schema=MyModel.model_json_schema(),
+        )
+
+
 @pytest.mark.parametrize(
     "value",
     [Book(title="Dune", pages=412), dict],

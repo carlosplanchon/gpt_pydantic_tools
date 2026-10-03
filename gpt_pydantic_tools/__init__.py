@@ -115,6 +115,11 @@ def pydantic_obj_to_tool_schema(
     tool_name: str | None = None
         ) -> ToolsSchemaT:
 
+    if pydantic_obj is not None and pydantic_obj_json_schema is not None:
+        raise ValueError(
+            "Pass either pydantic_obj or pydantic_obj_json_schema, not both"
+        )
+
     if pydantic_obj is not None and not (
         isinstance(pydantic_obj, type) and issubclass(pydantic_obj, BaseModel)
     ):
