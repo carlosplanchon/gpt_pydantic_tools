@@ -171,7 +171,10 @@ def pydantic_obj_to_tool_schema(
         keyword="title"
     )
 
-    description = gpt_function_dict.pop("description", description)
+    # The schema description (e.g. the model docstring) is only used when
+    # no description is given.
+    schema_description = gpt_function_dict.pop("description", "")
+    description = description or schema_description
 
     tool_dict = {
         "name": tool_name,

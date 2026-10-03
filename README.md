@@ -10,7 +10,7 @@ Turn Pydantic models into function-calling tools. `gpt-pydantic-tools` converts 
 
 ## Features
 
-- **Model to tool:** converts a Pydantic model, or a JSON schema, into a Chat Completions function tool. The model's docstring becomes the tool description.
+- **Model to tool:** converts a Pydantic model, or a JSON schema, into a Chat Completions function tool. The model's docstring becomes the tool description, unless you pass `description`.
 - **Lean schemas:** strips the `title` that Pydantic adds to every schema, without touching fields or values that are also called `title`.
 - **Valid tool names:** names the tool after the model, or after `tool_name`, and checks the name against the API rules: 1 to 64 ASCII letters, digits, underscores or dashes.
 - **`tool_choice` values:** `auto`, `required`, `none`, or forcing this tool.

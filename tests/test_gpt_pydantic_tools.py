@@ -91,6 +91,14 @@ def test_description_comes_from_the_docstring():
     assert "description" not in function["parameters"]
 
 
+def test_explicit_description_wins_over_the_docstring(make_manager):
+    manager = make_manager(Book, description="Look up a book.")
+    function = manager.tools_schema[0]["function"]
+
+    assert function["description"] == "Look up a book."
+    assert "description" not in function["parameters"]
+
+
 def test_function_and_manager_give_the_same_tool():
     from_function = pydantic_obj_to_tool_schema(pydantic_obj=MyModel)
     from_manager = ToolSchemaManager(pydantic_obj=MyModel).tools_schema
