@@ -222,8 +222,15 @@ def pydantic_obj_to_tool_schema(
 ModelT = TypeVar("ModelT", bound=BaseModel, covariant=True, default=BaseModel)
 
 
-@dataclass(slots=True, weakref_slot=True)
-class ToolSchemaManager(Generic[ModelT]):
+class _WeakReferenceable:
+    # Gives instances the __weakref__ slot. dataclass(weakref_slot=True)
+    # leaves it out on Python 3.12.0 to 3.12.3 when the class also
+    # subclasses Generic (CPython gh-118033, fixed in 3.12.4).
+    __slots__ = ("__weakref__",)
+
+
+@dataclass(slots=True)
+class ToolSchemaManager(_WeakReferenceable, Generic[ModelT]):
     pydantic_obj: Optional[type[ModelT]] = None
     pydantic_obj_json_schema: Optional[dict[Any, Any]] = None
 
