@@ -1,5 +1,7 @@
 # LLM Pydantic Tools
 
+![LLM Pydantic Tools banner](https://raw.githubusercontent.com/carlosplanchon/llm-pydantic-tools/main/assets/banner.jpg)
+
 Turn Pydantic models into function-calling tools. `llm-pydantic-tools` converts a model, or a JSON schema, into the tool format of the main LLM APIs (OpenAI Chat Completions and Responses, Anthropic and Gemini), builds the matching `tool_choice` value, and validates the arguments the model sends back.
 
 [![CI](https://github.com/carlosplanchon/llm-pydantic-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosplanchon/llm-pydantic-tools/actions/workflows/ci.yml)
