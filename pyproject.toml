@@ -3,13 +3,13 @@ requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gpt-pydantic-tools"
+name = "llm-pydantic-tools"
 version = "0.3"
 authors = [
     {name = "Carlos A. Planchón", email = "carlosandresplanchonprestes@gmail.com"}
 ]
 requires-python = ">=3.11"
-description = "Define GPT tool schemas using Pydantic."
+description = "Turn Pydantic models into LLM tools for OpenAI, Anthropic and Gemini."
 classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Build Tools",
@@ -23,7 +23,7 @@ classifiers = [
 license = "MIT"
 license-files = ["LICENSE"]
 
-keywords = ["gpt", "ai", "tool", "schemas", "pydantic", "json"]
+keywords = ["llm", "ai", "gpt", "openai", "anthropic", "claude", "gemini", "tool", "function-calling", "schemas", "pydantic", "json"]
 readme = "README.md"
 dependencies=[
     "pydantic>=2.7.1",
@@ -31,10 +31,10 @@ dependencies=[
 ]
 
 [project.urls]
-Repository = "https://github.com/carlosplanchon/gpt-pydantic-tools.git"
+Repository = "https://github.com/carlosplanchon/llm-pydantic-tools.git"
 
 [tool.setuptools]
-packages = ["gpt_pydantic_tools"]
+packages = ["llm_pydantic_tools"]
 
 [dependency-groups]
 dev = ["pytest>=8", "mypy>=2", "types-jsonschema>=4.22"]

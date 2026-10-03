@@ -1,12 +1,12 @@
-# GPT Pydantic Tools
+# LLM Pydantic Tools
 
-Turn Pydantic models into function-calling tools. `gpt-pydantic-tools` converts a model, or a JSON schema, into the tool format of the main LLM APIs (OpenAI Chat Completions and Responses, Anthropic and Gemini), builds the matching `tool_choice` value, and validates the arguments the model sends back.
+Turn Pydantic models into function-calling tools. `llm-pydantic-tools` converts a model, or a JSON schema, into the tool format of the main LLM APIs (OpenAI Chat Completions and Responses, Anthropic and Gemini), builds the matching `tool_choice` value, and validates the arguments the model sends back.
 
-[![CI](https://github.com/carlosplanchon/gpt-pydantic-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosplanchon/gpt-pydantic-tools/actions/workflows/ci.yml)
-[![PyPI version](https://img.shields.io/pypi/v/gpt-pydantic-tools.svg)](https://pypi.org/project/gpt-pydantic-tools/)
-[![Python versions](https://img.shields.io/pypi/pyversions/gpt-pydantic-tools.svg)](https://pypi.org/project/gpt-pydantic-tools/)
+[![CI](https://github.com/carlosplanchon/llm-pydantic-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosplanchon/llm-pydantic-tools/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/llm-pydantic-tools.svg)](https://pypi.org/project/llm-pydantic-tools/)
+[![Python versions](https://img.shields.io/pypi/pyversions/llm-pydantic-tools.svg)](https://pypi.org/project/llm-pydantic-tools/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/carlosplanchon/gpt-pydantic-tools)
+[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/carlosplanchon/llm-pydantic-tools)
 
 ## Features
 
@@ -19,13 +19,13 @@ Turn Pydantic models into function-calling tools. `gpt-pydantic-tools` converts 
 ## Installation
 
 ```bash
-uv add gpt-pydantic-tools
+uv add llm-pydantic-tools
 ```
 
 Or with pip:
 
 ```bash
-pip install gpt-pydantic-tools
+pip install llm-pydantic-tools
 ```
 
 ## Usage
@@ -37,7 +37,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from gpt_pydantic_tools import ToolChoiceEnum, ToolSchemaManager, get_tool_choice_dict
+from llm_pydantic_tools import ToolChoiceEnum, ToolSchemaManager, get_tool_choice_dict
 
 
 class GetWeather(BaseModel):
@@ -155,7 +155,7 @@ With Anthropic's SDK:
 ```python
 import anthropic
 
-from gpt_pydantic_tools import ToolFormat
+from llm_pydantic_tools import ToolFormat
 
 client = anthropic.Anthropic()
 
@@ -228,7 +228,7 @@ The tools are plain dicts, so they work with each provider's SDK or with raw HTT
 - Gemini asks for a description of every function, and supports a subset of JSON Schema.
 - Tool names follow the strictest rule of these APIs (Chat Completions'), so a valid name works with all of them.
 
-`gpt-pydantic-tools` only depends on Pydantic and jsonschema, which makes it handy when you build the requests yourself or switch between providers.
+`llm-pydantic-tools` only depends on Pydantic and jsonschema, which makes it handy when you build the requests yourself or switch between providers.
 
 ## Contributing
 

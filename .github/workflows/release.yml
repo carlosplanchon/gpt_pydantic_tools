@@ -36,7 +36,7 @@ jobs:
       - name: Build sdist and wheel
         run: uv build
       - name: Smoke test the wheel
-        run: uv run --isolated --no-project --with dist/*.whl python -c "import gpt_pydantic_tools"
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import llm_pydantic_tools"
       - uses: actions/upload-artifact@v7
         with:
           name: dist

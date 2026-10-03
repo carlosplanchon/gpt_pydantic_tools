@@ -172,20 +172,20 @@ def pydantic_obj_to_tool_schema(
             "choose another one)"
         )
 
-    gpt_function_dict = remove_keyword_from_schema(
+    parameters = remove_keyword_from_schema(
         schema=json_data,
         keyword="title"
     )
 
     # The schema description (e.g. the model docstring) is only used when
     # no description is given.
-    schema_description = gpt_function_dict.pop("description", "")
+    schema_description = parameters.pop("description", "")
     description = description or schema_description
 
     tool_dict = {
         "name": tool_name,
         "description": description,
-        "parameters": gpt_function_dict
+        "parameters": parameters
     }
 
     tools_schema = [

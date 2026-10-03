@@ -10,7 +10,7 @@ import pytest
 from jsonschema import ValidationError
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from gpt_pydantic_tools import (
+from llm_pydantic_tools import (
     ToolChoiceEnum,
     ToolFormat,
     ToolSchemaManager,
