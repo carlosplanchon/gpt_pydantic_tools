@@ -27,7 +27,8 @@ keywords = ["llm", "ai", "gpt", "openai", "anthropic", "claude", "gemini", "tool
 readme = "README.md"
 dependencies=[
     "pydantic>=2.7.1",
-    "jsonschema>=4.22.0"
+    "jsonschema>=4.22.0",
+    "typing_extensions>=4.12"
 ]
 
 [project.urls]
@@ -47,3 +48,8 @@ testpaths = ["tests"]
 # subset) so linting stays deterministic across ruff releases. ruff 0.16
 # widened its implicit default.
 select = ["E4", "E7", "E9", "F"]
+
+[tool.mypy]
+# With mypy also checking the tests, an import of a name the package does
+# not re-export fails here, as it does for pyright users of the package.
+no_implicit_reexport = true

@@ -81,6 +81,34 @@ def format_tool(
             raise ValueError(f"Invalid tool format: {tool_format}")
 
 
+def group_tools(
+    tools: list[dict[str, Any]],
+    tool_format: ToolFormat
+        ) -> list[dict[str, Any]]:
+    """
+    Build the tools list of a request from several tool definitions.
+
+    Gemini's generate_content groups the function declarations in a
+    single tool; the other APIs take the tool definitions as they are.
+
+    :param tools: Tool definitions in the given format
+    :param tool_format: Format of the API that receives the tools
+    :return: Value for the tools parameter of the API
+    """
+    match tool_format:
+        case ToolFormat.GEMINI:
+            return [{"function_declarations": tools}] if tools else []
+        case (
+            ToolFormat.CHAT_COMPLETIONS
+            | ToolFormat.RESPONSES
+            | ToolFormat.ANTHROPIC
+            | ToolFormat.GEMINI_INTERACTIONS
+        ):
+            return tools
+        case _:
+            raise ValueError(f"Invalid tool format: {tool_format}")
+
+
 def format_tool_choice(
     tool_choice: ToolChoiceEnum,
     tool_name: str,

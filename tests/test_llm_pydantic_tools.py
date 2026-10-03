@@ -8,12 +8,14 @@ from uuid import UUID
 
 import pytest
 from jsonschema import ValidationError
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import ValidationError as PydanticValidationError
 
 from llm_pydantic_tools import (
     ToolChoiceEnum,
     ToolFormat,
     ToolSchemaManager,
+    format_tools,
     get_tool_choice_dict,
     pydantic_obj_to_tool_schema,
     remove_key_from_dict,
@@ -631,3 +633,100 @@ def test_invalid_tool_format():
         manager.tool("not-a-format")
     with pytest.raises(ValueError, match="Invalid tool format"):
         get_tool_choice_dict(ToolChoiceEnum.AUTO, manager, "not-a-format")
+
+
+# --- Several tools ---
+
+def test_format_tools_builds_the_tools_list():
+    my_model = ToolSchemaManager(pydantic_obj=MyModel)
+    book = ToolSchemaManager(pydantic_obj=Book)
+
+    assert format_tools([my_model, book]) == [
+        my_model.tools_schema[0],
+        book.tools_schema[0],
+    ]
+    assert format_tools([my_model, book], ToolFormat.ANTHROPIC) == [
+        my_model.tool(ToolFormat.ANTHROPIC),
+        book.tool(ToolFormat.ANTHROPIC),
+    ]
+
+
+def test_format_tools_groups_gemini_declarations():
+    my_model = ToolSchemaManager(pydantic_obj=MyModel)
+    book = ToolSchemaManager(pydantic_obj=Book)
+
+    assert format_tools([my_model, book], ToolFormat.GEMINI) == [
+        {
+            "function_declarations": [
+                my_model.tool(ToolFormat.GEMINI),
+                book.tool(ToolFormat.GEMINI),
+            ]
+        }
+    ]
+
+
+@pytest.mark.parametrize("tool_format", list(ToolFormat))
+def test_format_tools_with_no_tools(tool_format):
+    assert format_tools([], tool_format) == []
+
+
+def test_format_tools_rejects_duplicate_names():
+    with pytest.raises(ValueError, match="Duplicate tool name"):
+        format_tools([
+            ToolSchemaManager(pydantic_obj=Book),
+            ToolSchemaManager(pydantic_obj=Book),
+        ])
+
+
+# --- Parsing ---
+
+class Booking(BaseModel):
+    when: datetime
+    guests: int
+
+    @field_validator("guests")
+    @classmethod
+    def at_least_one(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("at least one guest")
+        return value
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    ['{"title": "Dune", "pages": 412}', {"title": "Dune", "pages": 412}],
+    ids=["json-string", "dict"],
+)
+def test_parse_returns_an_instance_of_the_model(arguments):
+    book = ToolSchemaManager(pydantic_obj=Book).parse(arguments)
+
+    assert book == Book(title="Dune", pages=412)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    ['{"title": "Dune"}', "not json", {"title": "Dune"}],
+    ids=["json-missing-field", "invalid-json", "dict-missing-field"],
+)
+def test_parse_rejects_invalid_arguments(arguments):
+    with pytest.raises(PydanticValidationError):
+        ToolSchemaManager(pydantic_obj=Book).parse(arguments)
+
+
+def test_parse_runs_the_pydantic_validators():
+    manager = ToolSchemaManager(pydantic_obj=Booking)
+    arguments = {"when": "2026-10-03T20:00:00", "guests": 0}
+
+    # The JSON schema can't express the custom validator.
+    assert manager.is_valid(arguments) is True
+    with pytest.raises(PydanticValidationError, match="at least one guest"):
+        manager.parse(arguments)
+
+
+def test_parse_needs_a_model():
+    manager = ToolSchemaManager(
+        pydantic_obj_json_schema=Book.model_json_schema()
+    )
+
+    with pytest.raises(ValueError, match="pydantic_obj"):
+        manager.parse({"title": "Dune", "pages": 412})

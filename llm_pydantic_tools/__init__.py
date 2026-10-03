@@ -12,14 +12,33 @@ import copy
 
 import re
 
+from collections.abc import Iterable
+
 from typing import Any
+from typing import Generic
 from typing import Optional
+
+from typing_extensions import TypeVar
 
 from .formats import ToolChoiceEnum
 from .formats import ToolChoiceT
 from .formats import ToolFormat
 from .formats import format_tool
 from .formats import format_tool_choice
+from .formats import group_tools
+
+__all__ = [
+    "ToolChoiceEnum",
+    "ToolChoiceT",
+    "ToolFormat",
+    "ToolSchemaManager",
+    "ToolsSchemaT",
+    "format_tools",
+    "get_tool_choice_dict",
+    "pydantic_obj_to_tool_schema",
+    "remove_key_from_dict",
+    "remove_keyword_from_schema",
+]
 
 
 def remove_key_from_dict(
@@ -197,9 +216,15 @@ def pydantic_obj_to_tool_schema(
     return tools_schema
 
 
+# Model of a manager. Covariant, so that a manager of any model fits where
+# a ToolSchemaManager is expected, and BaseModel by default, for managers
+# built from a JSON schema.
+ModelT = TypeVar("ModelT", bound=BaseModel, covariant=True, default=BaseModel)
+
+
 @dataclass(slots=True, weakref_slot=True)
-class ToolSchemaManager:
-    pydantic_obj: Optional[type[BaseModel]] = None
+class ToolSchemaManager(Generic[ModelT]):
+    pydantic_obj: Optional[type[ModelT]] = None
     pydantic_obj_json_schema: Optional[dict[Any, Any]] = None
 
     tools_schema: ToolsSchemaT = field(init=False)
@@ -246,6 +271,27 @@ class ToolSchemaManager:
             return False
         return True
 
+    def parse(self, arguments: Any) -> ModelT:
+        """
+        Turn the arguments of a tool call into an instance of the model.
+
+        Unlike validate(), it runs the Pydantic model, with its validators
+        and type conversions.
+
+        :param arguments: Arguments of the tool call, as a JSON string
+            (OpenAI) or already parsed (Anthropic, Gemini)
+        :return: Instance of the model
+        :raises pydantic.ValidationError: If they don't fit the model
+        """
+        if self.pydantic_obj is None:
+            raise ValueError(
+                "parse() needs a Pydantic model, "
+                "build the manager with pydantic_obj"
+            )
+        if isinstance(arguments, (str, bytes, bytearray)):
+            return self.pydantic_obj.model_validate_json(arguments)
+        return self.pydantic_obj.model_validate(arguments)
+
     def validate_tool_answer(
         self,
         schema_to_validate: Any,
@@ -276,6 +322,33 @@ class ToolSchemaManager:
             parameters=copy.deepcopy(function["parameters"]),
             tool_format=tool_format
         )
+
+
+def format_tools(
+    schema_managers: Iterable[ToolSchemaManager],
+    tool_format: ToolFormat = ToolFormat.CHAT_COMPLETIONS
+        ) -> list[dict[str, Any]]:
+    """
+    Build the tools list of a request from several managers.
+
+    :param schema_managers: Managers of the tools to send
+    :param tool_format: Format of the API that receives the tools
+    :return: Value for the tools parameter of the API
+    """
+    managers = list(schema_managers)
+
+    # The model calls tools by name, so two tools can't share one.
+    names: set[str] = set()
+    for manager in managers:
+        name = manager.tools_schema[0]["function"]["name"]
+        if name in names:
+            raise ValueError(f"Duplicate tool name: {name!r}")
+        names.add(name)
+
+    return group_tools(
+        tools=[manager.tool(tool_format) for manager in managers],
+        tool_format=tool_format
+    )
 
 
 #####################################

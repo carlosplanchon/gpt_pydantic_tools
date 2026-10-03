@@ -15,6 +15,7 @@ Turn Pydantic models into function-calling tools. `llm-pydantic-tools` converts 
 - **Valid tool names:** names the tool after the model, or after `tool_name`, and checks the name against the API rules: 1 to 64 ASCII letters, digits, underscores or dashes.
 - **`tool_choice` values:** `auto`, `required`, `none`, or forcing this tool, in the format of each API.
 - **Answer validation:** checks the arguments the model returns against the tool's schema.
+- **Typed parsing:** turns the arguments into an instance of your model, running its Pydantic validators.
 
 ## Installation
 
@@ -127,6 +128,17 @@ If you only need a yes or no, `weather_tool.is_valid(arguments)` returns `True` 
 
 `validate_tool_answer()`, from earlier versions, still returns `True` or the error instead of raising it. Compare its result with `is True`: the error counts as true in an `if`.
 
+### Get an instance of the model
+
+`validate()` checks the arguments against the JSON schema, so it also works when you start from a schema. If you built the tool from a model, `parse()` goes further: it runs Pydantic, with your validators and type conversions, and returns an instance of the model. It takes the arguments as a JSON string or already parsed:
+
+```python
+weather = weather_tool.parse(tool_call.function.arguments)  # a GetWeather
+print(weather.city)
+```
+
+If the arguments don't fit the model, it raises a `pydantic.ValidationError`.
+
 ### Start from a JSON schema
 
 If you already have the JSON schema, pass it instead of the model. The tool is named after the schema's `title`; if it has none, pass `tool_name`:
@@ -140,15 +152,17 @@ schema_manager = ToolSchemaManager(
 
 ### Other formats
 
-`tools_schema` holds the tool in the Chat Completions format. `tool()` returns it in the format of another API, and `get_tool_choice_dict()` takes the same format as its third argument:
+`tools_schema` holds the tool in the Chat Completions format. `tool()` returns it in the format of another API, and `format_tools()` builds the `tools` list of a request from several managers. `get_tool_choice_dict()` takes the same format as its third argument:
 
-| `ToolFormat` | API | Pass `tool()` in | Pass `get_tool_choice_dict()` as |
-|---|---|---|---|
-| `CHAT_COMPLETIONS` (default) | OpenAI Chat Completions, and compatible APIs such as Mistral's and Ollama's | `tools` | `tool_choice` |
-| `RESPONSES` | OpenAI Responses API | `tools` | `tool_choice` |
-| `ANTHROPIC` | Anthropic's Messages API (Claude) | `tools` | `tool_choice` |
-| `GEMINI` | Gemini's `generate_content` | `tools=[{"function_declarations": [...]}]` | `tool_config` |
-| `GEMINI_INTERACTIONS` | Gemini's Interactions API | `tools` | `generation_config["tool_choice"]` |
+| `ToolFormat` | API | Pass `get_tool_choice_dict()` as |
+|---|---|---|
+| `CHAT_COMPLETIONS` (default) | OpenAI Chat Completions, and compatible APIs such as Mistral's and Ollama's | `tool_choice` |
+| `RESPONSES` | OpenAI Responses API | `tool_choice` |
+| `ANTHROPIC` | Anthropic's Messages API (Claude) | `tool_choice` |
+| `GEMINI` | Gemini's `generate_content` | `tool_config` |
+| `GEMINI_INTERACTIONS` | Gemini's Interactions API | `generation_config["tool_choice"]` |
+
+The tools always go in `tools`. For Gemini's `generate_content`, `format_tools()` groups them in a single `function_declarations` list, as that API expects, and in every format it rejects two tools with the same name.
 
 With Anthropic's SDK:
 
@@ -200,11 +214,13 @@ where `weather_tool.tool(ToolFormat.ANTHROPIC)` is:
 }
 ```
 
-With Gemini's `generate_content`, group the tools of every manager in a single `function_declarations` list:
+With Gemini's `generate_content`:
 
 ```python
 from google import genai
 from google.genai import types
+
+from llm_pydantic_tools import format_tools
 
 client = genai.Client()
 
@@ -212,7 +228,7 @@ response = client.models.generate_content(
     model="gemini-flash-latest",
     contents="What's the weather in Montevideo?",
     config=types.GenerateContentConfig(
-        tools=[{"function_declarations": [weather_tool.tool(ToolFormat.GEMINI)]}],
+        tools=format_tools([weather_tool], ToolFormat.GEMINI),
         tool_config=get_tool_choice_dict(ToolChoiceEnum.TOOL_NAME, weather_tool, ToolFormat.GEMINI),
     ),
 )
