@@ -3,6 +3,7 @@
 from pydantic import BaseModel
 
 import jsonschema
+from jsonschema.exceptions import ValidationError
 
 from dataclasses import dataclass
 from dataclasses import field
@@ -114,12 +115,6 @@ def pydantic_obj_to_tool_schema(
     tool_name: str | None = None
         ) -> ToolsSchemaT:
 
-    if pydantic_obj is None and pydantic_obj_json_schema is None:
-        raise ValueError(
-            "You need to provide either pydantic_obj "
-            "or pydantic_obj_json_schema"
-        )
-
     if pydantic_obj is not None and not (
         isinstance(pydantic_obj, type) and issubclass(pydantic_obj, BaseModel)
     ):
@@ -141,8 +136,13 @@ def pydantic_obj_to_tool_schema(
 
     if pydantic_obj is not None:
         json_data = pydantic_obj.model_json_schema()
-    else:
+    elif pydantic_obj_json_schema is not None:
         json_data = pydantic_obj_json_schema
+    else:
+        raise ValueError(
+            "You need to provide either pydantic_obj "
+            "or pydantic_obj_json_schema"
+        )
 
     if tool_name is None:
         if "title" not in json_data:
@@ -166,10 +166,7 @@ def pydantic_obj_to_tool_schema(
         keyword="title"
     )
 
-    if "description" in gpt_function_dict.keys():
-        description: str = gpt_function_dict.pop("description")
-    else:
-        description = description
+    description = gpt_function_dict.pop("description", description)
 
     tool_dict = {
         "name": tool_name,
@@ -198,7 +195,7 @@ class ToolSchemaManager:
     # When not given, the tool is named after the schema title.
     tool_name: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.tools_schema = pydantic_obj_to_tool_schema(
             pydantic_obj=self.pydantic_obj,
             pydantic_obj_json_schema=self.pydantic_obj_json_schema,
@@ -231,20 +228,20 @@ class ToolSchemaManager:
         """
         try:
             self.validate(arguments)
-        except jsonschema.exceptions.ValidationError:
+        except ValidationError:
             return False
         return True
 
     def validate_tool_answer(
         self,
-        schema_to_validate,
-            ) -> bool | jsonschema.exceptions.ValidationError:
+        schema_to_validate: Any,
+            ) -> bool | ValidationError:
 
         try:
             self.validate(schema_to_validate)
             # print("JSON data is valid.")
             return True
-        except jsonschema.exceptions.ValidationError as err:
+        except ValidationError as err:
             # print("JSON data is invalid.")
             return err
 
@@ -258,10 +255,10 @@ ToolChoiceT = dict[str, Any] | str
 
 
 class ToolChoiceEnum(StrEnum):
-    AUTO: str = "auto"
-    REQUIRED: str = "required"
-    NONE: str = "none"
-    TOOL_NAME: str = "tool_name"
+    AUTO = "auto"
+    REQUIRED = "required"
+    NONE = "none"
+    TOOL_NAME = "tool_name"
 
 
 def get_tool_choice_dict(

@@ -16,7 +16,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14"
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed"
 ]
 
 license = "MIT"
@@ -36,7 +37,7 @@ Repository = "https://github.com/carlosplanchon/gpt-pydantic-tools.git"
 packages = ["gpt_pydantic_tools"]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "mypy>=2", "types-jsonschema>=4.22"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
